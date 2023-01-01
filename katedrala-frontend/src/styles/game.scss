@@ -1,0 +1,116 @@
+.board {
+	box-shadow: inset 0 12px 36px #00000033;
+	box-sizing: border-box;
+	border-radius: 12px;
+	overflow: visible;
+	border-collapse: collapse;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	aspect-ratio: 1/1;
+	position: relative;
+
+	.row {
+		flex: 1;
+		width: 100%;
+		display: flex;
+		justify-items: center;
+		position: relative;
+		::after {
+			content: "";
+			width: 100%;
+			height: 100%;
+			top: 0;
+			left: 0;
+			border: 1px solid #ffffff05;
+			position: absolute;
+		}
+	}
+
+	.piece {
+		padding: 4px;
+		position: relative;
+		overflow: visible;
+		flex: 1;
+		max-width: 10%;
+		transition: none;
+		box-sizing: border-box;
+
+		&.active {
+			div {
+				height: 130%;
+				transform: translateY(-30%);
+				box-shadow: inset 0 -14px 0px #00000033;
+				opacity: 1;
+			}
+		}
+
+		div {
+			width: 100%;
+			height: 100%;
+			bottom: 0px;
+			border-radius: 6px;
+			transform: translateY(0%);
+			text-anchor: end;
+			margin-top: auto;
+			display: inline-block;
+			vertical-align: bottom;
+			box-shadow: inset 0 0px 0px #00000000;
+			opacity: 0;
+		}
+
+		&.adj-r {
+			padding-right: 0px;
+			padding-top: 2px;
+			padding-bottom: 2px;
+			div {
+				border-top-right-radius: 0px;
+				border-bottom-right-radius: 0px;
+			}
+		}
+		&.adj-l {
+			padding-left: 0px;
+			padding-top: 2px;
+			padding-bottom: 2px;
+			div {
+				border-top-left-radius: 0px;
+				border-bottom-left-radius: 0px;
+			}
+		}
+		&.adj-t {
+			padding-top: 2px;
+			padding-left: 0px;
+			padding-right: 0px;
+			div {
+				border-top-right-radius: 0px;
+				border-top-left-radius: 0px;
+			}
+		}
+		&.adj-b {
+			padding-bottom: 2px;
+			padding-left: 0px;
+			padding-right: 0px;
+			div {
+				border-bottom-right-radius: 0px;
+				border-bottom-left-radius: 0px;
+				box-shadow: none !important;
+			}
+		}
+	}
+}
+
+@media only screen and (max-width: 768px) {
+	.board {
+		.piece {
+			position: relative;
+			&.active {
+				height: 120%;
+				transform: translateY(-20%);
+				box-shadow: inset 0 -20px 0px #00000033;
+				opacity: 1;
+			}
+		}
+	}
+}
+
