@@ -19,6 +19,8 @@ const getIndexOfK = (arr: any[][], k: any): [number, number] | null => {
 };
 
 const touchesThreeBorders = (indices: Array<[number, number]>, maxX: number, maxY: number) => {
+	if (indices.length >= 20) return true;
+
 	const touchesMinX = indices.some((row) => row[1] === 0);
 	const touchesMinY = indices.some((row) => row[0] === 0);
 	const touchesMaxX = indices.some((row) => row[1] === maxX);
@@ -63,12 +65,9 @@ export default class Game {
 		const currentTurn = allPlayers.find((p) => p.isTurn);
 
 		if (currentTurn) {
-			const boardStateEmpty = this.boardState.fields.map((r) =>
-				r.map((c) => ((!c.pieceId && !c.playerId) || (!c.pieceId && c.playerId === currentTurn.playerId) ? 0 : 1))
-			);
 			for (let pIndex = 0; pIndex < currentTurn.availablePieces.length; pIndex++) {
-				for (let i = 1; i < 9; i++) {
-					for (let j = 1; j < 9; j++) {
+				for (let i = 0; i < 10; i++) {
+					for (let j = 0; j < 10; j++) {
 						if (this.validPlacement(currentTurn.availablePieces[pIndex].pieceId, [i, j], 0, currentTurn.playerId))
 							return;
 						if (this.validPlacement(currentTurn.availablePieces[pIndex].pieceId, [i, j], 1, currentTurn.playerId))
@@ -81,7 +80,7 @@ export default class Game {
 				}
 			}
 			let winner = allPlayers.reduce((prev, curr) =>
-				prev.availablePieces.length < curr.availablePieces.length ? prev : curr
+				prev.numberOfRemainingBlocks() < curr.numberOfRemainingBlocks() ? prev : curr
 			);
 			this.winner = winner.playerId;
 			this.finished = true;

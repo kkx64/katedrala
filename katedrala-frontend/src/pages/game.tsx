@@ -84,6 +84,10 @@ const GamePage = () => {
 					gameId,
 				})
 			);
+			setSelectedPiece([[]]);
+			setSelectedPieceId(-1);
+			setOrientation(0);
+			setHoverArray(Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => false)));
 		}
 	};
 
@@ -135,6 +139,13 @@ const GamePage = () => {
 				<div
 					onContextMenu={(e) => {
 						e.preventDefault();
+						e.stopPropagation();
+					}}
+					onWheel={(e) => {
+						if (isMobile) {
+							e.preventDefault();
+							e.stopPropagation();
+						}
 					}}
 					className="board select-none border-4 border-gray-800 w-full h-auto md:h-full md:w-auto"
 				>
@@ -239,9 +250,10 @@ const GamePage = () => {
 								{pieces[piece.pieceId] &&
 									pieces[piece.pieceId].map((row, i) => (
 										<div className="row flex-1 flex items-center">
-											{row.map((field, j) => (
-												<div className={`${field && "bg-gray-300"} aspect-square flex-1 w-full h-full`} />
-											))}
+											{row &&
+												row.map((field, j) => (
+													<div className={`${field && "bg-gray-300"} aspect-square flex-1 w-full h-full`} />
+												))}
 										</div>
 									))}
 							</div>

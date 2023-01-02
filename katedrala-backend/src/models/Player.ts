@@ -13,5 +13,17 @@ export default class Player {
 		this.username = username;
 		this.color = color;
 	}
+
+	numberOfRemainingBlocks(): number {
+		let fieldCount = 0;
+		this.availablePieces.forEach((piece) => {
+			pieces[piece.pieceId].forEach(function (row, i) {
+				row.forEach((field) => {
+					if (field === true) fieldCount++;
+				});
+			});
+		});
+		return fieldCount;
+	}
 }
 

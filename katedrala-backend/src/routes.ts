@@ -59,6 +59,7 @@ router.post("/createGame", (req, res) => {
 	newGame.creator = req.query.uid as string;
 	games[newGame.id] = newGame;
 	games[newGame.id].lastMoveTime = new Date().getTime() / 1000;
+	console.log(`${clc.yellow(`[${newGame.id}]`)}${clc.bgGreen("[Game Created]")}`);
 	res.status(200).send(newGame.id);
 });
 
@@ -106,20 +107,29 @@ router.get("/gameStream/:id", (req, res) => {
 		// ! Reconnected
 		if (games[gameId].players[userId]) {
 			games[gameId].players[userId].connected = true;
+			console.log(
+				`${clc.yellow(`[${gameId}]`)}${clc.green("[Reconnected]")} Player ${games[gameId].players[userId].username}`
+			);
 		}
 
 		// ! Player connected to game
 		else if (games[gameId].numPlayers < 2) {
 			games[gameId].players[userId] = new Player(userId, username, playerColors[games[gameId].numPlayers]);
+			console.log(
+				`${clc.yellow(`[${gameId}]`)}${clc.greenBright("[Connected]")} Player ${games[gameId].players[userId].username}`
+			);
 			games[gameId].numPlayers++;
 			req.on("close", () => {
 				if (games[gameId]) {
-					console.log(`${clc.red("[Disconnected]")} Player ${games[gameId].players[userId].username}`);
+					console.log(
+						`${clc.yellow(`[${gameId}]`)}${clc.red("[Disconnected]")} Player ${games[gameId].players[userId].username}`
+					);
 					delete games[gameId].listeners[userId];
 					games[gameId].players[userId].connected = false;
 				}
 			});
 		} else {
+			console.log(`${clc.yellow(`[${gameId}]`)}${clc.blue("[Spectator Connected]")} ${userId}`);
 			// ! Just a spectator
 			req.on("close", () => {
 				if (games[gameId]) {
@@ -138,6 +148,7 @@ Cron.schedule("* * * * *", () => {
 	for (const gId in games) {
 		if (currentTime - games[gId].lastMoveTime >= 600) {
 			games[gId].finished = true;
+			console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
 			transmitGameState(gId);
 			delete games[gId]; // delete games idle for 10 minutes
 		}

@@ -5,6 +5,9 @@ import type { AppDispatch, RootState } from "../store";
 import Game from "../models/Game";
 import axios from "axios";
 
+const API_URL =
+	process.env.NODE_ENV === "development" ? process.env.REACT_APP_API_URL_DEV : process.env.REACT_APP_API_URL;
+
 interface MainState {
 	currentGame: null | Game;
 	pieces: boolean[][][];
@@ -78,23 +81,29 @@ export const refreshMyUid = () => (dispatch: AppDispatch) => {
 };
 
 export const getId = () => (dispatch: AppDispatch) => {
+	dispatch(setLoadingReducer(true));
 	axios
-		.get(`${process.env.REACT_APP_API_URL}/getId`)
+		.get(`${API_URL}/getId`)
 		.then((result) => {
+			dispatch(setLoadingReducer(false));
 			dispatch(getIdReducer(result.data));
 		})
 		.catch((error) => {
+			dispatch(setLoadingReducer(false));
 			console.error(error);
 		});
 };
 
 export const getPieces = () => (dispatch: AppDispatch) => {
+	dispatch(setLoadingReducer(true));
 	axios
-		.get(`${process.env.REACT_APP_API_URL}/getPieces`)
+		.get(`${API_URL}/getPieces`)
 		.then((result) => {
+			dispatch(setLoadingReducer(false));
 			dispatch(getPiecesReducer(result.data));
 		})
 		.catch((error) => {
+			dispatch(setLoadingReducer(false));
 			console.error(error);
 		});
 };
@@ -109,7 +118,7 @@ interface PlacePieceRequest {
 export const placePiece = (props: PlacePieceRequest) => (dispatch: AppDispatch) => {
 	dispatch(setLoadingReducer(true));
 	axios
-		.post(`${process.env.REACT_APP_API_URL}/placePiece/${props.gameId}?uid=${localStorage.getItem("uid")}`, props)
+		.post(`${API_URL}/placePiece/${props.gameId}?uid=${localStorage.getItem("uid")}`, props)
 		.then((result) => {
 			dispatch(setLoadingReducer(false));
 		})
@@ -122,7 +131,7 @@ export const placePiece = (props: PlacePieceRequest) => (dispatch: AppDispatch) 
 export const startGame = (id: string) => (dispatch: AppDispatch) => {
 	dispatch(setLoadingReducer(true));
 	axios
-		.post(`${process.env.REACT_APP_API_URL}/startGame/${id}?uid=${localStorage.getItem("uid")}`)
+		.post(`${API_URL}/startGame/${id}?uid=${localStorage.getItem("uid")}`)
 		.then((result) => {
 			dispatch(setLoadingReducer(false));
 		})
@@ -135,7 +144,7 @@ export const startGame = (id: string) => (dispatch: AppDispatch) => {
 export const createGame = () => (dispatch: AppDispatch) => {
 	dispatch(setLoadingReducer(true));
 	axios
-		.post(`${process.env.REACT_APP_API_URL}/createGame?uid=${localStorage.getItem("uid")}`)
+		.post(`${API_URL}/createGame?uid=${localStorage.getItem("uid")}`)
 		.then((result) => {
 			dispatch(createGameReducer(result.data));
 			dispatch(setLoadingReducer(false));
@@ -148,7 +157,7 @@ export const createGame = () => (dispatch: AppDispatch) => {
 
 export const connectToGame = (id: string) => (dispatch: AppDispatch) => {
 	const eventSource = new EventSource(
-		`${process.env.REACT_APP_API_URL}/gameStream/${id}
+		`${API_URL}/gameStream/${id}
 		?uid=${localStorage.getItem("uid")}
 		&usr=${localStorage.getItem("username")}`
 	);
