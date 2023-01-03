@@ -38,7 +38,7 @@
 		box-sizing: border-box;
 
 		&.active {
-			div {
+			:first-child {
 				height: 130%;
 				transform: translateY(-30%);
 				box-shadow: inset 0 -14px 0px #00000033;
@@ -46,7 +46,7 @@
 			}
 		}
 
-		div {
+		:first-child {
 			width: 100%;
 			height: 100%;
 			bottom: 0px;

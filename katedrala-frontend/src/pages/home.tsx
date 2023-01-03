@@ -93,7 +93,7 @@ const HomePage = () => {
 					<li>The Cathedral piece (white) is already placed.</li>
 					<li>The game ends when no more pieces can be placed.</li>
 					<li>
-						The player with the <b>least</b> number of pieces left in their hand wins.
+						The player whose <b>remaining pieces</b> take up <b>the least amount of places</b> wins.
 					</li>
 				</ul>
 				<p>Some more details:</p>

@@ -9,10 +9,10 @@ export default class Piece {
 export const pieces: Array<boolean[][]> = [
 	[
 		// ! Cathedral
-		[false, true, false],
-		[true, true, true],
-		[false, true, false],
-		[false, true, false],
+		[false, true, false],	//	     []  
+		[true, true, true],		//	  [][][]
+		[false, true, false],	//     []
+		[false, true, false],	//    []
 	],
 	[
 		[false, false, false],

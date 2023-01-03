@@ -1,10 +1,10 @@
 import "../styles/game.scss";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { useParams, Link } from "react-router-dom";
 import { isMobile } from "react-device-detect";
 
 import { useAppSelector, useAppDispatch, RootState } from "../redux/store";
-import { useEffect, useState } from "react";
 import { connectToGame, disconnectFromGame, placePiece, startGame } from "../redux/slices/mainSlice";
 import { rotateMatrix90C } from "../utils/matrixUtils";
 
@@ -15,30 +15,48 @@ const GamePage = () => {
 	const [selectedPieceId, setSelectedPieceId] = useState(-1);
 	const [orientation, setOrientation] = useState(0);
 	const [hoveringPosition, setHoveringPosition] = useState(null as null | [number, number]);
+	const [originalHoveringPosition, setOriginalHoveringPosition] = useState(null as null | [number, number]);
 	const [hoverArray, setHoverArray] = useState(
 		Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => false))
 	);
+
+	const boardFieldRef = useRef<HTMLDivElement>(null);
+	const boardRef = useCallback((node: HTMLDivElement | null) => {
+		if (node) {
+			node.addEventListener(
+				"touchmove",
+				(e) => {
+					e.preventDefault();
+				},
+				{ passive: false }
+			);
+		}
+	}, []);
+
+	const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
 
 	const dispatch = useAppDispatch();
 	const { currentGame, myUid, pieces } = useAppSelector((state: RootState) => state.main);
 
 	useEffect(() => {
-		if (gameId) dispatch(connectToGame(gameId));
-		return () => {
-			dispatch(disconnectFromGame());
-		};
+		if (gameId) {
+			if (!currentGame || currentGame?.id !== gameId) dispatch(connectToGame(gameId));
+		}
 	}, [dispatch, gameId]);
 
 	useEffect(() => {
-		let pc = pieces[selectedPieceId];
-		for (let i = 0; i < orientation; i++) {
-			pc = rotateMatrix90C(selectedPiece);
+		if (selectedPieceId && pieces[selectedPieceId]) {
+			let pc = pieces[selectedPieceId];
+			for (let i = 0; i < orientation; i++) {
+				pc = rotateMatrix90C(selectedPiece);
+			}
+			setSelectedPiece(pc);
 		}
-		setSelectedPiece(pc);
 	}, [orientation]);
 
 	useEffect(() => {
 		setHoveringPosition(Object.create(hoveringPosition));
+		setOriginalHoveringPosition(Object.create(hoveringPosition));
 	}, [selectedPiece]);
 
 	const increaseOrientation = () => {
@@ -75,7 +93,7 @@ const GamePage = () => {
 	}, [hoveringPosition]);
 
 	const onPlacePiece = () => {
-		if (selectedPieceId && hoveringPosition && gameId) {
+		if (selectedPieceId >= 0 && hoveringPosition && gameId) {
 			dispatch(
 				placePiece({
 					pieceId: selectedPieceId,
@@ -97,6 +115,27 @@ const GamePage = () => {
 		else if (field && !field.pieceId && field.playerId) return currentGame?.players[field.playerId].color + "55";
 		else if (field && field.pieceId !== undefined && !field.playerId) return "white";
 		return "transparent";
+	};
+
+	const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
+
+	const moveHoveredPiece = (x: number, y: number) => {
+		if (hoveringPosition && originalHoveringPosition) {
+			setHoveringPosition([
+				clamp(Math.floor(originalHoveringPosition[0] + y), 0, 9),
+				clamp(Math.floor(originalHoveringPosition[1] + x), 0, 9),
+			]);
+		}
+	};
+
+	const onDragBoardMovePiece = (e: React.TouchEvent) => {
+		const itemWidth = boardFieldRef.current?.getBoundingClientRect().width ?? 100;
+		if (isMobile) {
+			moveHoveredPiece(
+				(e.touches[0].clientX - touchStart.x) / itemWidth,
+				(e.touches[0].clientY - touchStart.y) / itemWidth
+			);
+		}
 	};
 
 	if (!currentGame)
@@ -147,6 +186,24 @@ const GamePage = () => {
 							e.stopPropagation();
 						}
 					}}
+					onScroll={(e) => {
+						if (isMobile) {
+							e.preventDefault();
+							e.stopPropagation();
+						}
+					}}
+					onTouchStart={(e) => {
+						if (isMobile) {
+							setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+						}
+					}}
+					onTouchEnd={(e) => {
+						if (isMobile) setOriginalHoveringPosition(Object.create(hoveringPosition));
+					}}
+					ref={boardRef}
+					onTouchMove={(e) => {
+						onDragBoardMovePiece(e);
+					}}
 					className="board select-none border-4 border-gray-800 w-full h-auto md:h-full md:w-auto"
 				>
 					{currentGame?.boardState.fields.map((row, i) => (
@@ -154,8 +211,10 @@ const GamePage = () => {
 							{row.map((field, j) => (
 								<div
 									key={`${i},${j}`}
+									ref={boardFieldRef}
 									onMouseEnter={(e) => {
 										setHoveringPosition([i, j]);
+										setOriginalHoveringPosition([i, j]);
 									}}
 									onClick={() => {
 										if (!isMobile) onPlacePiece();
@@ -167,7 +226,9 @@ const GamePage = () => {
 											? currentGame.players[field.playerId as string].color + "44"
 											: "unset",
 									}}
-									className={`cursor-pointer piece ${field.pieceId !== null && field.pieceId !== undefined && "active"} 
+									className={`relative cursor-pointer piece ${
+										field.pieceId !== null && field.pieceId !== undefined && "active"
+									} 
 							${j > 0 && row[j - 1].pieceId === field.pieceId && row[j - 1].playerId === field.playerId && "adj-l"}
 							${j < row.length - 1 && row[j + 1].pieceId === field.pieceId && row[j + 1].playerId === field.playerId && "adj-r"}
 							${
@@ -190,6 +251,17 @@ const GamePage = () => {
 											backgroundColor: getFieldBackgroundColor(i, j),
 										}}
 										className={`${field.pieceId !== undefined && field.playerId === undefined && "bg-white"}`}
+									/>
+									<div
+										className="absolute transition-none top-0 left-0 pointer-events-none w-full h-full"
+										style={{
+											backgroundColor: hoverArray[i][j]
+												? currentGame.boardState.fields[i][j].pieceId !== undefined
+													? "#ff000044"
+													: "#ffffff22"
+												: "transparent",
+											zIndex: 10,
+										}}
 									/>
 								</div>
 							))}
@@ -266,7 +338,7 @@ const GamePage = () => {
 						{currentGame?.winner === myUid && "You Won! :)"}
 						{currentGame?.winner !== myUid && "You Lost... :( Better luck next time!"}
 					</h2>
-					<Link to={"/"} className="bg-yellow-500 px-8 py-4 rounded-xl">
+					<Link to="/" className="bg-yellow-500 px-8 py-4 rounded-xl">
 						<div>Home</div>
 					</Link>
 				</div>
