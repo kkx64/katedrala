@@ -164,45 +164,54 @@ export default class Game {
 				if (!touchesThreeBorders(filledResult.flooded, tempState[0].length - 1, tempState.length - 1)) {
 					filledResult.flooded.forEach((item: [number, number]) => {
 						// if the filled area doesn't touch three borders,
-						tempState[item[1]][item[0]] = 2; // it's a territory (given that it isn't larger than 1/4th the board)
+						tempState[item[1]][item[0]] = 2; // it's a possible territory
 					});
 				} else {
 					filledResult.flooded.forEach((item: [number, number]) => {
 						tempState[item[1]][item[0]] = 3;
 					});
 				}
-				emptySpaceIndex = getIndexOfK(tempState, 0);
-			}
-			let piecesToReturn = new Set<number>(); // pieces to return to the opposing player
 
-			for (let i = 0; i < tempState.length; i++) {
-				for (let j = 0; j < tempState[0].length; j++) {
-					if (tempState[i][j] == 2) {
-						if (this.boardState.fields[i][j].playerId !== player) {
-							if (this.boardState.fields[i][j].pieceId !== undefined && this.boardState.fields[i][j].pieceId !== null)
-								piecesToReturn.add(this.boardState.fields[i][j].pieceId);
-						}
-					}
-				}
-			}
-			// not a territory if there are more than 2 pieces inside
-			if (piecesToReturn.size < 2) {
+				let piecesToReturn = new Set<number>(); // pieces to return to the opposing player
+
 				for (let i = 0; i < tempState.length; i++) {
 					for (let j = 0; j < tempState[0].length; j++) {
 						if (tempState[i][j] == 2) {
 							if (this.boardState.fields[i][j].playerId !== player) {
-								this.boardState.fields[i][j].pieceId = null;
-								this.boardState.fields[i][j].playerId = player;
+								if (
+									this.boardState.fields[i][j].pieceId !== undefined &&
+									this.boardState.fields[i][j].pieceId !== null
+								) {
+									piecesToReturn.add(this.boardState.fields[i][j].pieceId);
+									if (piecesToReturn.size >= 2) break; // no need to check further
+								}
 							}
 						}
 					}
 				}
-				const otherPlayer = allPlayers.find((pl) => pl !== player);
-				if (otherPlayer) {
-					piecesToReturn.forEach((pi) => {
-						this.players[otherPlayer].availablePieces.push(new Piece(pi));
-					});
+
+				// not a territory if there are more than 2 pieces inside
+				if (piecesToReturn.size < 2) {
+					for (let i = 0; i < tempState.length; i++) {
+						for (let j = 0; j < tempState[0].length; j++) {
+							if (tempState[i][j] == 2) {
+								if (this.boardState.fields[i][j].playerId !== player) {
+									this.boardState.fields[i][j].pieceId = null;
+									this.boardState.fields[i][j].playerId = player;
+									tempState[i][j] = 3;
+								}
+							}
+						}
+					}
+					const otherPlayer = allPlayers.find((pl) => pl !== player);
+					if (otherPlayer) {
+						piecesToReturn.forEach((pi) => {
+							this.players[otherPlayer].availablePieces.push(new Piece(pi));
+						});
+					}
 				}
+
+				emptySpaceIndex = getIndexOfK(tempState, 0);
 			}
 		});
 	};
