@@ -28,10 +28,19 @@ const HomePage = () => {
 
 	return (
 		<div className="w-full">
+			<ins
+				className="adsbygoogle"
+				style={{ display: "block" }}
+				data-ad-client="ca-pub-7823764966313439"
+				data-ad-slot="8799023165"
+				data-ad-format="auto"
+				data-full-width-responsive="true"
+			></ins>
 			<header className="text-4xl relative w-full h-fit">
 				<h1 className="lg:absolute left-0 -top-28 z-0 opacity-10 text-[11vw] w-full text-center">KATEDRALA</h1>
 			</header>
-			<div className=" h-fit mt-12 lg:mt-36 z-[1] flex flex-col lg:flex-row items-stretch w-full gap-12">
+
+			<div className=" h-fit mt-12 z-[1] flex flex-col lg:flex-row items-stretch w-full gap-12">
 				<div className="flex-1 flex flex-col gap-4 justify-evenly bg-blue-600 bg-opacity-40 p-8 lg:p-16 rounded-2xl ring ring-blue-500">
 					<p className="text-2xl font-bold">Create Game</p>
 					<button
@@ -139,6 +148,14 @@ const HomePage = () => {
 				<p>
 					Send an email to <a href="mailto:kiril@playkatedrala.com">kiril@playkatedrala.com</a>.
 				</p>
+				<ins
+					className="adsbygoogle"
+					style={{ display: "block" }}
+					data-ad-client="ca-pub-7823764966313439"
+					data-ad-slot="2042043128"
+					data-ad-format="auto"
+					data-full-width-responsive="true"
+				></ins>
 			</div>
 		</div>
 	);

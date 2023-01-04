@@ -150,7 +150,7 @@ const GamePage = () => {
 		);
 
 	return (
-		<div className="w-full h-[86vh] flex flex-col items-center justify-evenly gap-8">
+		<div className="w-full h-[86vh] flex flex-col items-center justify-evenly gap-4">
 			<div className="opacity-50 text-2xl font-extrabold">Game {gameId}</div>
 
 			<div className="flex flex-col items-center">
@@ -179,18 +179,6 @@ const GamePage = () => {
 					onContextMenu={(e) => {
 						e.preventDefault();
 						e.stopPropagation();
-					}}
-					onWheel={(e) => {
-						if (isMobile) {
-							e.preventDefault();
-							e.stopPropagation();
-						}
-					}}
-					onScroll={(e) => {
-						if (isMobile) {
-							e.preventDefault();
-							e.stopPropagation();
-						}
 					}}
 					onTouchStart={(e) => {
 						if (isMobile) {
@@ -243,7 +231,7 @@ const GamePage = () => {
 								currentGame.boardState.fields[i + 1][j].playerId === field.playerId &&
 								"adj-b"
 							}
-							${hoverArray && hoverArray[i][j] && "bg-gray-600"}
+
 							`}
 								>
 									<div
@@ -256,7 +244,11 @@ const GamePage = () => {
 										className="absolute transition-none top-0 left-0 pointer-events-none w-full h-full"
 										style={{
 											backgroundColor: hoverArray[i][j]
-												? currentGame.boardState.fields[i][j].pieceId !== undefined
+												? (currentGame.boardState.fields[i][j].pieceId !== undefined &&
+														currentGame.boardState.fields[i][j].pieceId !== null) ||
+												  (currentGame.boardState.fields[i][j].playerId !== undefined &&
+														currentGame.boardState.fields[i][j].playerId !== null &&
+														currentGame.boardState.fields[i][j].playerId !== myUid)
 													? "#ff000044"
 													: "#ffffff22"
 												: "transparent",
@@ -343,6 +335,16 @@ const GamePage = () => {
 					</Link>
 				</div>
 			)}
+			<div className="hidden lg:visible absolute right-12 w-fit h-fit">
+				<ins
+					className="adsbygoogle"
+					style={{ display: "block" }}
+					data-ad-client="ca-pub-7823764966313439"
+					data-ad-slot="2634722459"
+					data-ad-format="auto"
+					data-full-width-responsive="true"
+				></ins>
+			</div>
 		</div>
 	);
 };

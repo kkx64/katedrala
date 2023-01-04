@@ -13,6 +13,7 @@ import { store } from "./redux/store";
 import HomePage from "./pages/home";
 import GamePage from "./pages/game";
 import SetUsernamePage from "./pages/username";
+import StatusPage from "./pages/status";
 
 const router = createBrowserRouter([
 	{
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
 		children: [
 			{ path: "/", element: <HomePage /> },
 			{ path: "/username", element: <SetUsernamePage /> },
+			{ path: "/status", element: <StatusPage /> },
 			{ path: "/game/:gameId", element: <GamePage /> },
 		],
 	},

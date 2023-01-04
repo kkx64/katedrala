@@ -82,3 +82,15 @@ body {
 	background: #ffffff66;
 }
 
+progress::-moz-progress-bar {
+	background: rgb(234 179 8);
+}
+progress::-webkit-progress-value {
+	background: rgb(234 179 8);
+}
+progress {
+	color: rgb(234 179 8);
+	border-radius: 100px;
+	overflow: hidden;
+}
+

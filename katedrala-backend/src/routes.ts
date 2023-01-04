@@ -3,6 +3,7 @@ import express from "express";
 import { v4 } from "uuid";
 import Cron from "node-cron";
 import clc from "cli-color";
+import os from "os";
 
 import _ from "lodash";
 
@@ -16,7 +17,7 @@ const router = express.Router();
 
 export let games = {} as { [key: string]: Game };
 
-const playerColors = ["#ff4757", "#3742fa", "#ffa502", "#2ed573"];
+const playerColors = ["#ffa502", "#3742fa", "#ff4757", "#2ed573"];
 
 const getFilteredGame = (id: string) => {
 	games[id].moveId++;
@@ -36,6 +37,16 @@ const transmitGameState = (id: string) => {
 		}
 	}
 };
+
+router.get("/status", (req, res) => {
+	res.status(200).send({
+		avgLoad: os.loadavg(),
+		totalMemory: os.totalmem(),
+		freeMemory: os.freemem(),
+		uptime: os.uptime(),
+		activeGames: Object.keys(games).length,
+	});
+});
 
 router.get("/getId", (req, res) => {
 	res.send(v4());
@@ -57,6 +68,7 @@ router.post("/startGame/:id", (req, res) => {
 router.post("/createGame", (req, res) => {
 	const newGame = new Game(getShortUUID());
 	newGame.creator = req.query.uid as string;
+	while (games[newGame.id]) newGame.id = getShortUUID(); // prevent duplicates
 	games[newGame.id] = newGame;
 	games[newGame.id].lastMoveTime = new Date().getTime() / 1000;
 	console.log(`${clc.yellow(`[${newGame.id}]`)}${clc.bgGreen("[Game Created]")}`);
@@ -126,6 +138,7 @@ router.get("/gameStream/:id", (req, res) => {
 					);
 					delete games[gameId].listeners[userId];
 					games[gameId].players[userId].connected = false;
+					transmitGameState(gameId);
 				}
 			});
 		} else {
@@ -146,7 +159,7 @@ router.get("/gameStream/:id", (req, res) => {
 Cron.schedule("* * * * *", () => {
 	const currentTime = new Date().getTime() / 1000;
 	for (const gId in games) {
-		if (currentTime - games[gId].lastMoveTime >= 600) {
+		if (currentTime - games[gId].lastMoveTime >= 600 || Object.keys(games[gId].players).length === 0) {
 			games[gId].finished = true;
 			console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
 			transmitGameState(gId);
@@ -156,4 +169,5 @@ Cron.schedule("* * * * *", () => {
 });
 
 module.exports = router;
+
 

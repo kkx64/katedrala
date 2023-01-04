@@ -4,6 +4,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import type { AppDispatch, RootState } from "../store";
 import Game from "../models/Game";
 import axios from "axios";
+import StatusResponse from "../models/StatusResponse";
 
 const API_URL =
 	process.env.NODE_ENV === "development" ? process.env.REACT_APP_API_URL_DEV : process.env.REACT_APP_API_URL;
@@ -15,6 +16,7 @@ interface MainState {
 	createdGameId: string | null;
 	gameStreamSource: null | EventSource;
 	myUid: null | string;
+	status: null | StatusResponse;
 }
 
 const initialState: MainState = {
@@ -24,6 +26,7 @@ const initialState: MainState = {
 	createdGameId: null,
 	gameStreamSource: null,
 	myUid: null,
+	status: null,
 };
 
 // * REDUCERS
@@ -60,6 +63,9 @@ export const mainSlice = createSlice({
 		setMyUidReducer: (state, action) => {
 			state.myUid = localStorage.getItem("uid");
 		},
+		getStatusReducer: (state, action) => {
+			state.status = action.payload;
+		},
 	},
 });
 
@@ -72,6 +78,7 @@ export const {
 	disconnectFromGameReducer,
 	getIdReducer,
 	setMyUidReducer,
+	getStatusReducer,
 } = mainSlice.actions;
 
 // * ACTIONS
@@ -173,6 +180,20 @@ export const connectToGame = (id: string) => (dispatch: AppDispatch) => {
 
 export const disconnectFromGame = () => (dispatch: AppDispatch) => {
 	dispatch(disconnectFromGameReducer(null));
+};
+
+export const getStatus = () => (dispatch: AppDispatch) => {
+	dispatch(setLoadingReducer(true));
+	axios
+		.get(`${API_URL}/status`)
+		.then((result) => {
+			dispatch(getStatusReducer(result.data));
+			dispatch(setLoadingReducer(false));
+		})
+		.catch((error) => {
+			console.error(error);
+			dispatch(setLoadingReducer(false));
+		});
 };
 
 export default mainSlice.reducer;

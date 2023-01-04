@@ -15,6 +15,7 @@ function App() {
 
 	useEffect(() => {
 		dispatch(getPieces());
+		if (!(window as any).adsbygoogle) ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
 
 		if (!localStorage.getItem("uid")) dispatch(getId());
 		else dispatch(refreshMyUid());
