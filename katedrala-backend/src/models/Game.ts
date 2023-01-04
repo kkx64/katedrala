@@ -19,8 +19,6 @@ const getIndexOfK = (arr: any[][], k: any): [number, number] | null => {
 };
 
 const touchesThreeBorders = (indices: Array<[number, number]>, maxX: number, maxY: number) => {
-	if (indices.length >= 20) return true; // don't allow territories that are too big
-
 	const touchesMinX = indices.some((row) => row[1] === 0);
 	const touchesMinY = indices.some((row) => row[0] === 0);
 	const touchesMaxX = indices.some((row) => row[1] === maxX);
@@ -57,6 +55,7 @@ export default class Game {
 		if (currentTurn >= 0) {
 			this.players[allPlayers[currentTurn].playerId].isTurn = false;
 			this.players[allPlayers[(currentTurn + 1) % allPlayers.length].playerId].isTurn = true;
+			this.moveId += 1;
 		}
 	};
 
@@ -66,7 +65,8 @@ export default class Game {
 
 		if (currentTurn) {
 			for (let pIndex = 0; pIndex < currentTurn.availablePieces.length; pIndex++) {
-				for (let i = 0; i < 10; i++) { // all current possible moves, there's probably a better way for this
+				for (let i = 0; i < 10; i++) {
+					// all current possible moves, there's probably a better way for this
 					for (let j = 0; j < 10; j++) {
 						if (this.validPlacement(currentTurn.availablePieces[pIndex].pieceId, [i, j], 0, currentTurn.playerId))
 							return;
@@ -121,15 +121,19 @@ export default class Game {
 				}
 				for (let y = 0; y < piece.length; y++) {
 					for (let x = 0; x < piece[0].length; x++) {
-						if (piece[y][x]) { // y - 1 so the piece is centered
+						if (piece[y][x]) {
+							// y - 1 so the piece is centered
 							this.boardState.fields[y - 1 + position[1]][x - 1 + position[0]].pieceId = pieceId;
 							this.boardState.fields[y - 1 + position[1]][x - 1 + position[0]].playerId = playerId;
 						}
 					}
 				}
 				this.players[playerId].availablePieces.splice(this.players[playerId].availablePieces.indexOf(fnd), 1);
-				this.recalculateTerritories();
-				this.checkWinCondition();
+				if (this.moveId >= 2) {
+					// can't capture territories on the first move
+					this.recalculateTerritories();
+					this.checkWinCondition();
+				}
 				this.nextPlayer();
 				this.lastMoveTime = new Date().getTime() / 1000;
 				return true;
@@ -151,14 +155,16 @@ export default class Game {
 			}
 			let emptySpaceIndex = getIndexOfK(tempState, 0); // find the first remaining empty spot
 			while (emptySpaceIndex) {
-				let filledResult = floodFill({  // flood fill the empty areas
+				let filledResult = floodFill({
+					// flood fill the empty areas
 					getter: (x, y) => tempState[y][x],
 					seed: emptySpaceIndex,
 					diagonals: true,
 				});
 				if (!touchesThreeBorders(filledResult.flooded, tempState[0].length - 1, tempState.length - 1)) {
-					filledResult.flooded.forEach((item: [number, number]) => {	// if the filled area doesn't touch three borders,
-						tempState[item[1]][item[0]] = 2;						// it's a territory (given that it isn't larger than 1/4th the board)
+					filledResult.flooded.forEach((item: [number, number]) => {
+						// if the filled area doesn't touch three borders,
+						tempState[item[1]][item[0]] = 2; // it's a territory (given that it isn't larger than 1/4th the board)
 					});
 				} else {
 					filledResult.flooded.forEach((item: [number, number]) => {
@@ -167,24 +173,36 @@ export default class Game {
 				}
 				emptySpaceIndex = getIndexOfK(tempState, 0);
 			}
-			let piecesToReturn = new Set<number>();	// pieces to return to the opposing player
+			let piecesToReturn = new Set<number>(); // pieces to return to the opposing player
+
 			for (let i = 0; i < tempState.length; i++) {
 				for (let j = 0; j < tempState[0].length; j++) {
 					if (tempState[i][j] == 2) {
 						if (this.boardState.fields[i][j].playerId !== player) {
 							if (this.boardState.fields[i][j].pieceId !== undefined && this.boardState.fields[i][j].pieceId !== null)
 								piecesToReturn.add(this.boardState.fields[i][j].pieceId);
-							this.boardState.fields[i][j].pieceId = null;
-							this.boardState.fields[i][j].playerId = player;
 						}
 					}
 				}
 			}
-			const otherPlayer = allPlayers.find((pl) => pl !== player);
-			if (otherPlayer) {
-				piecesToReturn.forEach((pi) => {
-					this.players[otherPlayer].availablePieces.push(new Piece(pi));
-				});
+			// not a territory if there are more than 2 pieces inside
+			if (piecesToReturn.size < 2) {
+				for (let i = 0; i < tempState.length; i++) {
+					for (let j = 0; j < tempState[0].length; j++) {
+						if (tempState[i][j] == 2) {
+							if (this.boardState.fields[i][j].playerId !== player) {
+								this.boardState.fields[i][j].pieceId = null;
+								this.boardState.fields[i][j].playerId = player;
+							}
+						}
+					}
+				}
+				const otherPlayer = allPlayers.find((pl) => pl !== player);
+				if (otherPlayer) {
+					piecesToReturn.forEach((pi) => {
+						this.players[otherPlayer].availablePieces.push(new Piece(pi));
+					});
+				}
 			}
 		});
 	};

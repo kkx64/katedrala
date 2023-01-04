@@ -20,7 +20,6 @@ export let games = {} as { [key: string]: Game };
 const playerColors = ["#ffa502", "#3742fa", "#ff4757", "#2ed573"];
 
 const getFilteredGame = (id: string) => {
-	games[id].moveId++;
 	const game = _.cloneDeep(games[id]);
 	delete game.listeners;
 	return `data: ${JSON.stringify(game)}\n\n`;
@@ -159,15 +158,18 @@ router.get("/gameStream/:id", (req, res) => {
 Cron.schedule("* * * * *", () => {
 	const currentTime = new Date().getTime() / 1000;
 	for (const gId in games) {
-		if (currentTime - games[gId].lastMoveTime >= 600 || Object.keys(games[gId].players).length === 0) {
+		if (
+			currentTime - games[gId].lastMoveTime >= 300 ||
+			Object.keys(games[gId].players).length === 0 ||
+			games[gId].finished
+		) {
 			games[gId].finished = true;
 			console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
 			transmitGameState(gId);
-			delete games[gId]; // delete games idle for 10 minutes
+			delete games[gId]; // delete finished games and games idle for too long
 		}
 	}
 });
 
 module.exports = router;
-
 

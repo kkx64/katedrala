@@ -2,8 +2,6 @@ import "reflect-metadata";
 require("dotenv").config();
 
 import express from "express";
-import Game from "./models/Game";
-import Player from "./models/Player";
 
 var bodyParser = require("body-parser");
 var cors = require("cors");
