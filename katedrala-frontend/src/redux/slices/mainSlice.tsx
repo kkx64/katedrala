@@ -179,16 +179,13 @@ export const createGame = () => (dispatch: AppDispatch) => {
 };
 
 export const getCurrentGames = () => (dispatch: AppDispatch) => {
-	dispatch(setLoadingReducer(true));
 	axios
 		.get(`${API_URL}/currentGames`)
 		.then((result) => {
 			dispatch(getCurrentGamesReducer(result.data));
-			dispatch(setLoadingReducer(false));
 		})
 		.catch((error) => {
 			console.error(error);
-			dispatch(setLoadingReducer(false));
 		});
 };
 
