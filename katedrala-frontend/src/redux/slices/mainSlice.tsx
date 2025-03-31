@@ -9,6 +9,16 @@ import StatusResponse from "../models/StatusResponse";
 const API_URL =
 	process.env.NODE_ENV === "development" ? process.env.REACT_APP_API_URL_DEV : process.env.REACT_APP_API_URL;
 
+interface CurrentGameInfo {
+	id: string;
+	creator: string;
+	numPlayers: number;
+	createdAt: number;
+	lastMoveTime: number;
+	lastPlayerTime: number;
+	finished: boolean;
+}
+
 interface MainState {
 	currentGame: null | Game;
 	pieces: boolean[][][];
@@ -17,6 +27,7 @@ interface MainState {
 	gameStreamSource: null | EventSource;
 	myUid: null | string;
 	status: null | StatusResponse;
+	currentGames: CurrentGameInfo[]; // New state property
 }
 
 const initialState: MainState = {
@@ -27,6 +38,7 @@ const initialState: MainState = {
 	gameStreamSource: null,
 	myUid: null,
 	status: null,
+	currentGames: [], // Initialize current games array
 };
 
 // * REDUCERS
@@ -66,6 +78,9 @@ export const mainSlice = createSlice({
 		getStatusReducer: (state, action) => {
 			state.status = action.payload;
 		},
+		getCurrentGamesReducer: (state, action) => {
+			state.currentGames = action.payload;
+		},
 	},
 });
 
@@ -79,6 +94,7 @@ export const {
 	getIdReducer,
 	setMyUidReducer,
 	getStatusReducer,
+	getCurrentGamesReducer,
 } = mainSlice.actions;
 
 // * ACTIONS
@@ -154,6 +170,20 @@ export const createGame = () => (dispatch: AppDispatch) => {
 		.post(`${API_URL}/createGame?uid=${localStorage.getItem("uid")}`)
 		.then((result) => {
 			dispatch(createGameReducer(result.data));
+			dispatch(setLoadingReducer(false));
+		})
+		.catch((error) => {
+			console.error(error);
+			dispatch(setLoadingReducer(false));
+		});
+};
+
+export const getCurrentGames = () => (dispatch: AppDispatch) => {
+	dispatch(setLoadingReducer(true));
+	axios
+		.get(`${API_URL}/currentGames`)
+		.then((result) => {
+			dispatch(getCurrentGamesReducer(result.data));
 			dispatch(setLoadingReducer(false));
 		})
 		.catch((error) => {

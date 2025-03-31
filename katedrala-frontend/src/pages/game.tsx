@@ -150,7 +150,7 @@ const GamePage = () => {
 		);
 
 	return (
-		<div className="w-full h-[86vh] flex flex-col items-center justify-evenly gap-4">
+		<div className="w-full h-[100svh] p-16 flex flex-col items-center justify-evenly gap-4">
 			<div className="opacity-50 text-2xl font-extrabold">Game {gameId}</div>
 
 			<div className="flex flex-col items-center">
@@ -237,6 +237,7 @@ const GamePage = () => {
 									<div
 										style={{
 											backgroundColor: getFieldBackgroundColor(i, j),
+											filter: `drop-shadow(0 0 4px ${getFieldBackgroundColor(i, j)})`,
 										}}
 										className={`${field.pieceId !== undefined && field.playerId === undefined && "bg-white"}`}
 									/>

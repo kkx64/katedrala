@@ -35,7 +35,7 @@ function App() {
 	}, [dispatch]);
 
 	return (
-		<div className="App bg-gray-900">
+		<div className="App bg-gray-900 arcade-background">
 			<Outlet />
 			<div
 				className={`fixed top-0 left-0 w-full h-full bg-gray-900 bg-opacity-80
