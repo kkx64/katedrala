@@ -152,25 +152,26 @@ export default class Game {
 			for (let i = 0; i < tempState.length; i++) {
 				for (let j = 0; j < tempState[0].length; j++) {
 					if (tempState[i][j].playerId === player) tempState[i][j] = 1;
-					else tempState[i][j] = 0;
+					else if (tempState[i][j].playerId === null) tempState[i][j] = 0; // empty space
+					else tempState[i][j] = 2; // opponent pieces
 				}
 			}
 			let emptySpaceIndex = getIndexOfK(tempState, 0); // find the first remaining empty spot
 			while (emptySpaceIndex) {
 				let filledResult = floodFill({
 					// flood fill the empty areas
-					getter: (x, y) => tempState[y][x],
+					getter: (x, y) => (tempState[y][x] === 0 || tempState[y][x] === 2 ? 0 : 1), // treat empty and opponent pieces as fillable
 					seed: emptySpaceIndex,
 					diagonals: true,
 				});
 				if (!touchesThreeBorders(filledResult.flooded, tempState[0].length - 1, tempState.length - 1)) {
 					filledResult.flooded.forEach((item: [number, number]) => {
 						// if the filled area doesn't touch three borders,
-						tempState[item[1]][item[0]] = 2; // it's a possible territory
+						tempState[item[1]][item[0]] = 3; // it's a possible territory
 					});
 				} else {
 					filledResult.flooded.forEach((item: [number, number]) => {
-						tempState[item[1]][item[0]] = 3;
+						tempState[item[1]][item[0]] = 4;
 					});
 				}
 
@@ -178,8 +179,8 @@ export default class Game {
 
 				for (let i = 0; i < tempState.length; i++) {
 					for (let j = 0; j < tempState[0].length; j++) {
-						if (tempState[i][j] == 2) {
-							if (this.boardState.fields[i][j].playerId !== player) {
+						if (tempState[i][j] == 3) {
+							if (this.boardState.fields[i][j].playerId !== player && this.boardState.fields[i][j].playerId !== null) {
 								if (
 									this.boardState.fields[i][j].pieceId !== undefined &&
 									this.boardState.fields[i][j].pieceId !== null
@@ -196,11 +197,11 @@ export default class Game {
 				if (piecesToReturn.size < 2) {
 					for (let i = 0; i < tempState.length; i++) {
 						for (let j = 0; j < tempState[0].length; j++) {
-							if (tempState[i][j] == 2) {
+							if (tempState[i][j] == 3) {
 								if (this.boardState.fields[i][j].playerId !== player) {
 									this.boardState.fields[i][j].pieceId = null;
 									this.boardState.fields[i][j].playerId = player;
-									tempState[i][j] = 3;
+									tempState[i][j] = 4;
 								}
 							}
 						}

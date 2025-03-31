@@ -55,6 +55,22 @@ router.get("/getPieces", (req, res) => {
 	res.send(pieces);
 });
 
+router.get("/currentGames", (req, res) => {
+	const currentGames = Object.keys(games).map((gameId) => {
+		const game = games[gameId];
+		return {
+			id: game.id,
+			creator: game.creator,
+			numPlayers: game.numPlayers,
+			createdAt: game.createdAt,
+			lastMoveTime: game.lastMoveTime,
+			lastPlayerTime: game.lastPlayerTime,
+			finished: game.finished,
+		};
+	});
+	res.status(200).send(currentGames);
+});
+
 router.post("/startGame/:id", (req, res) => {
 	const gameId = req.params.id;
 	games[gameId].started = true;
