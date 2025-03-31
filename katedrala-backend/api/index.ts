@@ -33,3 +33,4 @@ app.listen(process.env.PORT || 3001, (): void => {
 	console.log(`Server started on port ${process.env.PORT || 3001}`);
 });
 
+module.exports = app;
