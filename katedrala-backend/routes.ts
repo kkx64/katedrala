@@ -1,11 +1,10 @@
 import express from "express";
-
 import { v4 } from "uuid";
 import Cron from "node-cron";
 import clc from "cli-color";
 import os from "os";
-
 import _ from "lodash";
+import Redis from "ioredis";
 
 import Game from "./models/Game";
 import { pieces } from "./models/Piece";
@@ -15,25 +14,70 @@ import { getShortUUID } from "./utils/uuidUtils";
 
 const router = express.Router();
 
-export let games = {} as { [key: string]: Game };
+// Create a Redis client using standard Redis URL
+const redis = new Redis(process.env.REDIS_URL);
+
+// Connection tracking for SSE
+const activeConnections = new Map();
+
+// Helper functions for persistence
+async function getGame(id: string): Promise<Game | null> {
+	try {
+		const gameData = await redis.get(`game:${id}`);
+		if (!gameData) return null;
+
+		// Recreate the Game object from stored data
+		const game = new Game(id);
+		Object.assign(game, JSON.parse(gameData));
+		game.listeners = {}; // Reset listeners as they cannot be serialized
+		return game;
+	} catch (error) {
+		console.error(`Error fetching game ${id}:`, error);
+		return null;
+	}
+}
+
+async function saveGame(game: Game): Promise<void> {
+	const gameCopy = _.cloneDeep(game);
+	delete gameCopy.listeners; // Remove listeners before saving
+
+	try {
+		// Set expiration to 24 hours (86400 seconds)
+		await redis.set(`game:${game.id}`, JSON.stringify(gameCopy), "EX", 86400);
+	} catch (error) {
+		console.error(`Error saving game ${game.id}:`, error);
+	}
+}
+
+async function deleteGame(id: string): Promise<void> {
+	try {
+		await redis.del(`game:${id}`);
+	} catch (error) {
+		console.error(`Error deleting game ${id}:`, error);
+	}
+}
 
 const playerColors = ["#ffa502", "#3742fa", "#ff4757", "#2ed573"];
 
-const getFilteredGame = (id: string) => {
-	const game = _.cloneDeep(games[id]);
-	delete game.listeners;
-	return `data: ${JSON.stringify(game)}\n\n`;
+const getFilteredGame = (game: Game) => {
+	const gameCopy = _.cloneDeep(game);
+	delete gameCopy.listeners;
+	return `data: ${JSON.stringify(gameCopy)}\n\n`;
 };
 
-const transmitGameState = (id: string) => {
-	if (games[id]) {
-		for (const listener in games[id].listeners) {
-			games[id].listeners[listener].cork();
-			games[id].listeners[listener].write(getFilteredGame(id));
-			process.nextTick(() => {
-				if (games[id]) games[id].listeners[listener].uncork();
-			});
-		}
+const transmitGameState = async (id: string) => {
+	const game = await getGame(id);
+	if (!game) return;
+
+	const connections = activeConnections.get(id) || [];
+	const gameData = getFilteredGame(game);
+
+	for (const res of connections) {
+		res.cork();
+		res.write(gameData);
+		process.nextTick(() => {
+			res.uncork();
+		});
 	}
 };
 
@@ -43,7 +87,7 @@ router.get("/status", (req, res) => {
 		totalMemory: os.totalmem(),
 		freeMemory: os.freemem(),
 		uptime: os.uptime(),
-		activeGames: Object.keys(games).length,
+		activeGames: activeConnections.size,
 	});
 });
 
@@ -55,34 +99,56 @@ router.get("/getPieces", (req, res) => {
 	res.send(pieces);
 });
 
-router.post("/startGame/:id", (req, res) => {
+router.post("/startGame/:id", async (req, res) => {
 	const gameId = req.params.id;
-	games[gameId].started = true;
-	games[gameId].lastMoveTime = new Date().getTime() / 1000;
-	games[gameId].players[Object.keys(games[gameId].players)[0]].isTurn = true;
-	transmitGameState(gameId);
-	res.status(200).send();
+	const game = await getGame(gameId);
+	if (game) {
+		game.started = true;
+		game.lastMoveTime = new Date().getTime() / 1000;
+		game.players[Object.keys(game.players)[0]].isTurn = true;
+		await saveGame(game);
+		await transmitGameState(gameId);
+		res.status(200).send();
+	} else {
+		res.status(404).send("Game Doesn't Exist");
+	}
 });
 
-router.post("/createGame", (req, res) => {
+router.post("/createGame", async (req, res) => {
 	const newGame = new Game(getShortUUID());
 	newGame.creator = req.query.uid as string;
-	while (games[newGame.id]) newGame.id = getShortUUID(); // prevent duplicates
-	games[newGame.id] = newGame;
-	games[newGame.id].lastMoveTime = new Date().getTime() / 1000;
-	games[newGame.id].createdAt = new Date().getTime() / 1000;
-	games[newGame.id].lastPlayerTime = new Date().getTime() / 1000; // Track when last player was active
+
+	// Check for ID collision
+	let gameExists = true;
+	while (gameExists) {
+		const existingGame = await getGame(newGame.id);
+		if (!existingGame) {
+			gameExists = false;
+		} else {
+			newGame.id = getShortUUID();
+		}
+	}
+
+	newGame.lastMoveTime = new Date().getTime() / 1000;
+	newGame.createdAt = new Date().getTime() / 1000;
+	newGame.lastPlayerTime = new Date().getTime() / 1000;
+	newGame.listeners = {};
+
+	await saveGame(newGame);
 	console.log(`${clc.yellow(`[${newGame.id}]`)}${clc.bgGreen("[Game Created]")}`);
 	res.status(200).send(newGame.id);
 });
 
-router.post("/placePiece/:id", (req, res) => {
+router.post("/placePiece/:id", async (req, res) => {
 	const gameId = req.params.id;
 	const userId = req.query.uid as string;
-	if (games[gameId]) {
-		const result = games[gameId].placePiece(req.body.pieceId, req.body.position, userId, req.body.orientation);
+
+	const game = await getGame(gameId);
+	if (game) {
+		const result = game.placePiece(req.body.pieceId, req.body.position, userId, req.body.orientation);
 		if (result) {
-			transmitGameState(gameId);
+			await saveGame(game);
+			await transmitGameState(gameId);
 			res.status(200).send();
 		} else {
 			res.status(400).send("Invalid Move");
@@ -93,12 +159,13 @@ router.post("/placePiece/:id", (req, res) => {
 });
 
 // ! Realtime Stream
-router.get("/gameStream/:id", (req, res) => {
+router.get("/gameStream/:id", async (req, res) => {
 	const gameId = req.params.id;
 	const userId = req.query.uid as string;
 	const username = req.query.usr as string;
 
-	if (!games[gameId]) {
+	let game = await getGame(gameId);
+	if (!game) {
 		res.writeHead(404, {
 			"Content-Type": "text/event-stream",
 			"Cache-Control": "no-cache",
@@ -114,66 +181,97 @@ router.get("/gameStream/:id", (req, res) => {
 		Connection: "keep-alive",
 	});
 
-	// Update last player time whenever someone connects
-	games[gameId].lastPlayerTime = new Date().getTime() / 1000;
-	games[gameId].listeners[userId] = res;
-
-	// ! Reconnected
-	if (games[gameId].players[userId]) {
-		games[gameId].players[userId].connected = true;
-		console.log(
-			`${clc.yellow(`[${gameId}]`)}${clc.green("[Reconnected]")} Player ${games[gameId].players[userId].username}`
-		);
+	// Initialize connections array if needed
+	if (!activeConnections.has(gameId)) {
+		activeConnections.set(gameId, []);
 	}
 
-	// ! Player connected to game
-	else if (games[gameId].numPlayers < 2) {
-		games[gameId].players[userId] = new Player(userId, username, playerColors[games[gameId].numPlayers]);
+	// Add this connection
+	activeConnections.get(gameId).push(res);
+
+	// Update game with player info
+	game.lastPlayerTime = new Date().getTime() / 1000;
+	game.listeners[userId] = res; // Store the response object for this user
+
+	// Handle reconnection
+	if (game.players[userId]) {
+		game.players[userId].connected = true;
+		console.log(`${clc.yellow(`[${gameId}]`)}${clc.green("[Reconnected]")} Player ${game.players[userId].username}`);
+	}
+	// Handle new player
+	else if (game.numPlayers < 2) {
+		game.players[userId] = new Player(userId, username, playerColors[game.numPlayers]);
 		console.log(
-			`${clc.yellow(`[${gameId}]`)}${clc.greenBright("[Connected]")} Player ${games[gameId].players[userId].username}`
+			`${clc.yellow(`[${gameId}]`)}${clc.greenBright("[Connected]")} Player ${game.players[userId].username}`
 		);
-		games[gameId].numPlayers++;
-		req.on("close", () => {
-			if (games[gameId]) {
-				console.log(
-					`${clc.yellow(`[${gameId}]`)}${clc.red("[Disconnected]")} Player ${games[gameId].players[userId].username}`
-				);
-				delete games[gameId].listeners[userId];
-				games[gameId].players[userId].connected = false;
-				// Don't delete the player data, just mark them as disconnected
-				transmitGameState(gameId);
-			}
-		});
+		game.numPlayers++;
 	} else {
 		console.log(`${clc.yellow(`[${gameId}]`)}${clc.blue("[Spectator Connected]")} ${userId}`);
-		// ! Just a spectator
-		req.on("close", () => {
-			if (games[gameId]) {
-				delete games[gameId].listeners[userId];
-			}
-		});
 	}
-	transmitGameState(gameId);
+
+	await saveGame(game);
+
+	// Send initial state
+	res.write(getFilteredGame(game));
+
+	// Handle disconnection
+	req.on("close", async () => {
+		const connections = activeConnections.get(gameId) || [];
+		const index = connections.indexOf(res);
+		if (index !== -1) {
+			connections.splice(index, 1);
+		}
+
+		// Update game data
+		const updatedGame = await getGame(gameId);
+		if (updatedGame) {
+			if (updatedGame.players[userId]) {
+				console.log(
+					`${clc.yellow(`[${gameId}]`)}${clc.red("[Disconnected]")} Player ${updatedGame.players[userId].username}`
+				);
+				updatedGame.players[userId].connected = false;
+			}
+			await saveGame(updatedGame);
+			await transmitGameState(gameId);
+		}
+	});
 });
 
-Cron.schedule("* * * * *", () => {
-	const currentTime = new Date().getTime() / 1000;
-	for (const gId in games) {
-		const gameAge = currentTime - (games[gId].createdAt || 0);
-		const hasConnectedPlayers = Object.values(games[gId].players).some((player) => player.connected);
-		const isIdle = currentTime - games[gId].lastMoveTime >= 300;
-		const playersDisconnectedTime = currentTime - (games[gId].lastPlayerTime || 0);
+// Update cron job for cleanup
+Cron.schedule("* * * * *", async () => {
+	try {
+		// Get all game IDs
+		const gameIds = await redis.keys("game:*").then((keys) => keys.map((key) => key.replace("game:", "")));
 
-		// Only delete if:
-		// 1. Game is idle for 5 minutes, OR
-		// 2. No connected players for at least 10 minutes (increased from 5), OR
-		// 3. Game is marked as finished
-		if (isIdle || (!hasConnectedPlayers && playersDisconnectedTime >= 600) || games[gId].finished) {
-			games[gId].finished = true;
-			console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
-			transmitGameState(gId);
-			delete games[gId]; // delete finished games and games idle for too long
+		const currentTime = new Date().getTime() / 1000;
+
+		for (const gId of gameIds) {
+			const game = await getGame(gId);
+			if (!game) continue;
+
+			const gameAge = currentTime - (game.createdAt || 0);
+			const hasConnectedPlayers = Object.values(game.players).some((player) => player.connected);
+			const isIdle = currentTime - game.lastMoveTime >= 300;
+			const playersDisconnectedTime = currentTime - (game.lastPlayerTime || 0);
+
+			if (isIdle || (!hasConnectedPlayers && playersDisconnectedTime >= 600) || game.finished) {
+				game.finished = true;
+				console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
+				await transmitGameState(gId);
+				await deleteGame(gId);
+
+				// Clean up connections
+				if (activeConnections.has(gId)) {
+					const connections = activeConnections.get(gId);
+					for (const conn of connections) {
+						conn.end();
+					}
+					activeConnections.delete(gId);
+				}
+			}
 		}
+	} catch (error) {
+		console.error("Error in cleanup cron job:", error);
 	}
 });
 
