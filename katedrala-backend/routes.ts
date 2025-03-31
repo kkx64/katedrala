@@ -70,6 +70,8 @@ router.post("/createGame", (req, res) => {
 	while (games[newGame.id]) newGame.id = getShortUUID(); // prevent duplicates
 	games[newGame.id] = newGame;
 	games[newGame.id].lastMoveTime = new Date().getTime() / 1000;
+	games[newGame.id].createdAt = new Date().getTime() / 1000;
+	games[newGame.id].lastPlayerTime = new Date().getTime() / 1000; // Track when last player was active
 	console.log(`${clc.yellow(`[${newGame.id}]`)}${clc.bgGreen("[Game Created]")}`);
 	res.status(200).send(newGame.id);
 });
@@ -96,13 +98,7 @@ router.get("/gameStream/:id", (req, res) => {
 	const userId = req.query.uid as string;
 	const username = req.query.usr as string;
 
-	if (games[gameId])
-		res.writeHead(200, {
-			"Content-Type": "text/event-stream",
-			"Cache-Control": "no-cache, no-transform",
-			Connection: "keep-alive",
-		});
-	else {
+	if (!games[gameId]) {
 		res.writeHead(404, {
 			"Content-Type": "text/event-stream",
 			"Cache-Control": "no-cache",
@@ -112,57 +108,67 @@ router.get("/gameStream/:id", (req, res) => {
 		return;
 	}
 
-	if (games[gameId]) {
-		games[gameId].listeners[userId] = res;
+	res.writeHead(200, {
+		"Content-Type": "text/event-stream",
+		"Cache-Control": "no-cache, no-transform",
+		Connection: "keep-alive",
+	});
 
-		// ! Reconnected
-		if (games[gameId].players[userId]) {
-			games[gameId].players[userId].connected = true;
-			console.log(
-				`${clc.yellow(`[${gameId}]`)}${clc.green("[Reconnected]")} Player ${games[gameId].players[userId].username}`
-			);
-		}
+	// Update last player time whenever someone connects
+	games[gameId].lastPlayerTime = new Date().getTime() / 1000;
+	games[gameId].listeners[userId] = res;
 
-		// ! Player connected to game
-		else if (games[gameId].numPlayers < 2) {
-			games[gameId].players[userId] = new Player(userId, username, playerColors[games[gameId].numPlayers]);
-			console.log(
-				`${clc.yellow(`[${gameId}]`)}${clc.greenBright("[Connected]")} Player ${games[gameId].players[userId].username}`
-			);
-			games[gameId].numPlayers++;
-			req.on("close", () => {
-				if (games[gameId]) {
-					console.log(
-						`${clc.yellow(`[${gameId}]`)}${clc.red("[Disconnected]")} Player ${games[gameId].players[userId].username}`
-					);
-					delete games[gameId].listeners[userId];
-					games[gameId].players[userId].connected = false;
-					transmitGameState(gameId);
-				}
-			});
-		} else {
-			console.log(`${clc.yellow(`[${gameId}]`)}${clc.blue("[Spectator Connected]")} ${userId}`);
-			// ! Just a spectator
-			req.on("close", () => {
-				if (games[gameId]) {
-					delete games[gameId].listeners[userId];
-				}
-			});
-		}
-		transmitGameState(gameId);
-	} else {
-		res.end();
+	// ! Reconnected
+	if (games[gameId].players[userId]) {
+		games[gameId].players[userId].connected = true;
+		console.log(
+			`${clc.yellow(`[${gameId}]`)}${clc.green("[Reconnected]")} Player ${games[gameId].players[userId].username}`
+		);
 	}
+
+	// ! Player connected to game
+	else if (games[gameId].numPlayers < 2) {
+		games[gameId].players[userId] = new Player(userId, username, playerColors[games[gameId].numPlayers]);
+		console.log(
+			`${clc.yellow(`[${gameId}]`)}${clc.greenBright("[Connected]")} Player ${games[gameId].players[userId].username}`
+		);
+		games[gameId].numPlayers++;
+		req.on("close", () => {
+			if (games[gameId]) {
+				console.log(
+					`${clc.yellow(`[${gameId}]`)}${clc.red("[Disconnected]")} Player ${games[gameId].players[userId].username}`
+				);
+				delete games[gameId].listeners[userId];
+				games[gameId].players[userId].connected = false;
+				// Don't delete the player data, just mark them as disconnected
+				transmitGameState(gameId);
+			}
+		});
+	} else {
+		console.log(`${clc.yellow(`[${gameId}]`)}${clc.blue("[Spectator Connected]")} ${userId}`);
+		// ! Just a spectator
+		req.on("close", () => {
+			if (games[gameId]) {
+				delete games[gameId].listeners[userId];
+			}
+		});
+	}
+	transmitGameState(gameId);
 });
 
 Cron.schedule("* * * * *", () => {
 	const currentTime = new Date().getTime() / 1000;
 	for (const gId in games) {
-		if (
-			currentTime - games[gId].lastMoveTime >= 300 ||
-			Object.keys(games[gId].players).length === 0 ||
-			games[gId].finished
-		) {
+		const gameAge = currentTime - (games[gId].createdAt || 0);
+		const hasConnectedPlayers = Object.values(games[gId].players).some((player) => player.connected);
+		const isIdle = currentTime - games[gId].lastMoveTime >= 300;
+		const playersDisconnectedTime = currentTime - (games[gId].lastPlayerTime || 0);
+
+		// Only delete if:
+		// 1. Game is idle for 5 minutes, OR
+		// 2. No connected players for at least 10 minutes (increased from 5), OR
+		// 3. Game is marked as finished
+		if (isIdle || (!hasConnectedPlayers && playersDisconnectedTime >= 600) || games[gId].finished) {
 			games[gId].finished = true;
 			console.log(`${clc.yellow(`[${gId}]`)}${clc.bgRedBright("[Game Terminated]")}`);
 			transmitGameState(gId);

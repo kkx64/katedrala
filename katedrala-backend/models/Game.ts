@@ -42,6 +42,8 @@ export default class Game {
 	finished: boolean = false;
 	winner?: string;
 	creator: string;
+	createdAt: number;
+	lastPlayerTime: number;
 	moveId: number = 0;
 	listeners: { [key: string]: express.Response } = {};
 
